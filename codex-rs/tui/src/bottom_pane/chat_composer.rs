@@ -47,7 +47,6 @@ pub(crate) struct ChatComposer<'a> {
 impl ChatComposer<'_> {
     pub fn new(has_input_focus: bool, app_event_tx: AppEventSender) -> Self {
         let mut textarea = TextArea::default();
-        textarea.set_placeholder_text("send a message");
         textarea.set_cursor_line_style(ratatui::style::Style::default());
 
         let mut this = Self {

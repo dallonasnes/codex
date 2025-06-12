@@ -52,7 +52,9 @@ impl ConversationHistoryWidget {
     }
 
     pub(crate) fn is_conversation_new(&self) -> bool {
-        self.entries.is_empty()
+        !self.entries.iter().any(|entry| 
+            matches!(entry.cell, HistoryCell::UserPrompt { .. })
+        )
     }
 
     /// Returns true if it needs a redraw.

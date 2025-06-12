@@ -30,11 +30,18 @@ pub enum InputResult {
     None,
 }
 
+const SUGGESTIONS: &[&str] = &[
+    "explain this codebase to me",
+    "fix any build errors",
+    "are there any bugs in my code?",
+];
+
 pub(crate) struct ChatComposer<'a> {
     textarea: TextArea<'a>,
     command_popup: Option<CommandPopup>,
     app_event_tx: AppEventSender,
     history: ChatComposerHistory,
+    selected_suggestion: usize, // 0 = none, 1-3 = suggestion indices
 }
 
 impl ChatComposer<'_> {
@@ -48,6 +55,7 @@ impl ChatComposer<'_> {
             command_popup: None,
             app_event_tx,
             history: ChatComposerHistory::new(),
+            selected_suggestion: 0,
         };
         this.update_border(has_input_focus);
         this
@@ -154,6 +162,39 @@ impl ChatComposer<'_> {
     /// Handle key event when no popup is visible.
     fn handle_key_event_without_popup(&mut self, key_event: KeyEvent) -> (InputResult, bool) {
         let input: Input = key_event.into();
+
+        // Handle suggested prompts when input is empty
+        if self.textarea.lines().join("\n").trim().is_empty() {
+            match input {
+                Input { key: Key::Tab, shift: false, .. } => {
+                    // Cycle forward through suggestions
+                    self.selected_suggestion = (self.selected_suggestion + 1) % (SUGGESTIONS.len() + 1);
+                    return (InputResult::None, true);
+                }
+                Input { key: Key::Tab, shift: true, .. } => {
+                    // Cycle backward through suggestions
+                    if self.selected_suggestion == 0 {
+                        self.selected_suggestion = SUGGESTIONS.len();
+                    } else {
+                        self.selected_suggestion -= 1;
+                    }
+                    return (InputResult::None, true);
+                }
+                Input {
+                    key: Key::Enter,
+                    shift: false,
+                    alt: false,
+                    ctrl: false,
+                } if self.selected_suggestion > 0 => {
+                    // Submit selected suggestion
+                    let suggestion = SUGGESTIONS[self.selected_suggestion - 1];
+                    self.selected_suggestion = 0;
+                    return (InputResult::Submitted(suggestion.to_string()), true);
+                }
+                _ => {}
+            }
+        }
+
         match input {
             // -------------------------------------------------------------
             // History navigation (Up / Down) – only when the composer is not
@@ -218,6 +259,8 @@ impl ChatComposer<'_> {
     /// Handle generic Input events that modify the textarea content.
     fn handle_input_basic(&mut self, input: Input) -> (InputResult, bool) {
         self.textarea.input(input);
+        // Reset suggestion selection when user starts typing
+        self.selected_suggestion = 0;
         (InputResult::None, true)
     }
 
@@ -289,6 +332,14 @@ impl ChatComposer<'_> {
 
     pub(crate) fn is_command_popup_visible(&self) -> bool {
         self.command_popup.is_some()
+    }
+
+    pub(crate) fn is_input_empty(&self) -> bool {
+        self.textarea.lines().join("\n").trim().is_empty()
+    }
+
+    pub(crate) fn get_suggestion_state(&self) -> (usize, &'static [&'static str]) {
+        (self.selected_suggestion, SUGGESTIONS)
     }
 }
 

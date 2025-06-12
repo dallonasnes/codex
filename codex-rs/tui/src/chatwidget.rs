@@ -395,18 +395,62 @@ impl ChatWidget<'_> {
             tracing::error!("failed to submit op: {e}");
         }
     }
+
+    fn render_suggestions(&self, area: Rect, buf: &mut Buffer, selected_suggestion: usize, suggestions: &[&str]) {
+        use ratatui::style::{Color, Style};
+        use ratatui::text::{Span, Line};
+        use ratatui::widgets::{Paragraph, Wrap};
+
+        let mut spans = vec![Span::styled("try: ", Style::default().fg(Color::DarkGray))];
+        
+        for (index, suggestion) in suggestions.iter().enumerate() {
+            if index > 0 {
+                spans.push(Span::styled(" | ", Style::default().fg(Color::DarkGray)));
+            }
+            
+            let style = if index + 1 == selected_suggestion {
+                Style::default().bg(Color::DarkGray).fg(Color::White)
+            } else {
+                Style::default().fg(Color::DarkGray)
+            };
+            
+            spans.push(Span::styled(*suggestion, style));
+        }
+
+        let paragraph = Paragraph::new(Line::from(spans))
+            .wrap(Wrap { trim: true });
+        
+        paragraph.render(area, buf);
+    }
 }
 
 impl WidgetRef for &ChatWidget<'_> {
     fn render_ref(&self, area: Rect, buf: &mut Buffer) {
         let bottom_height = self.bottom_pane.calculate_required_height(&area);
+        let is_conversation_new = self.conversation_history.is_conversation_new();
+        
+        // Check if we need extra space for suggestions
+        let suggestions_height = if self.bottom_pane.get_suggestion_info(is_conversation_new).is_some() {
+            1 // One line for suggestions
+        } else {
+            0
+        };
 
         let chunks = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Min(0), Constraint::Length(bottom_height)])
+            .constraints([
+                Constraint::Min(0), 
+                Constraint::Length(bottom_height),
+                Constraint::Length(suggestions_height)
+            ])
             .split(area);
 
         self.conversation_history.render(chunks[0], buf);
         (&self.bottom_pane).render(chunks[1], buf);
+        
+        // Render suggestions if present
+        if let Some((selected_suggestion, suggestions)) = self.bottom_pane.get_suggestion_info(is_conversation_new) {
+            self.render_suggestions(chunks[2], buf, selected_suggestion, suggestions);
+        }
     }
 }

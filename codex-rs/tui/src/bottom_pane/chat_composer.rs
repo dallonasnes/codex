@@ -42,6 +42,7 @@ pub(crate) struct ChatComposer<'a> {
     app_event_tx: AppEventSender,
     history: ChatComposerHistory,
     selected_suggestion: usize, // 0 = none, 1-3 = suggestion indices
+    has_user_typed: bool,
 }
 
 impl ChatComposer<'_> {
@@ -55,6 +56,7 @@ impl ChatComposer<'_> {
             app_event_tx,
             history: ChatComposerHistory::new(),
             selected_suggestion: 0,
+            has_user_typed: false,
         };
         this.update_border(has_input_focus);
         this
@@ -231,6 +233,8 @@ impl ChatComposer<'_> {
                 let text = self.textarea.lines().join("\n");
                 self.textarea.select_all();
                 self.textarea.cut();
+                // Reset the flag since input is now empty
+                self.has_user_typed = false;
 
                 if text.is_empty() {
                     (InputResult::None, true)
@@ -260,6 +264,12 @@ impl ChatComposer<'_> {
         self.textarea.input(input);
         // Reset suggestion selection when user starts typing
         self.selected_suggestion = 0;
+        // Mark that user has typed, but reset if input becomes empty
+        if self.is_input_empty() {
+            self.has_user_typed = false;
+        } else {
+            self.has_user_typed = true;
+        }
         (InputResult::None, true)
     }
 
@@ -335,6 +345,11 @@ impl ChatComposer<'_> {
 
     pub(crate) fn is_input_empty(&self) -> bool {
         self.textarea.lines().join("\n").trim().is_empty()
+    }
+
+    pub(crate) fn should_show_suggestions(&self) -> bool {
+        // Show suggestions only if input is empty AND user hasn't typed anything
+        self.is_input_empty() && !self.has_user_typed
     }
 
     pub(crate) fn get_suggestion_state(&self) -> (usize, &'static [&'static str]) {

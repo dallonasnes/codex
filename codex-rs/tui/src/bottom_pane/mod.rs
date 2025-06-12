@@ -169,7 +169,7 @@ impl BottomPane<'_> {
 
     /// Get suggestion state for rendering (selected_index, suggestions_array, should_show)
     pub(crate) fn get_suggestion_info(&self, is_conversation_new: bool) -> Option<(usize, &'static [&'static str])> {
-        if self.active_view.is_none() && is_conversation_new && self.composer.is_input_empty() {
+        if self.active_view.is_none() && is_conversation_new && self.composer.should_show_suggestions() {
             let (selected, suggestions) = self.composer.get_suggestion_state();
             Some((selected, suggestions))
         } else {
